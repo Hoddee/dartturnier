@@ -11,12 +11,15 @@ Turnier-Software für 32 Spieler und 4 Scheiben: iPad-Eingabe an jeder Scheibe, 
 | `/board` | iPads | Scheibe einrichten, danach Eingabe unter `/board/1` bis `/board/4` |
 | `/admin` | Turnierleitung | Spieler, Gruppen, Spielplan, Spiele, Einstellungen |
 
-## 1. Supabase aktualisieren (einmalig)
+## 1. Supabase einrichten
 
-Die erste Migration hast du schon ausgeführt. Jetzt im **SQL Editor** den kompletten Inhalt von
-`supabase/migrations/20261006000001_board_flow.sql` einfügen und **Run** drücken.
+Das Projekt **Dartturnier_Software** (`https://ukqddtrmxxughmtrcjqr.supabase.co`) ist eingerichtet: alle drei Migrationen aus `supabase/migrations/` sind ausgeführt, der Board-Schlüssel ist gesetzt.
 
-Das Update bringt: Anwurf-Auswahl nach dem Ausbullen, Schutz gegen doppelte Eingaben bei wackligem WLAN, automatisches Weiterrücken der Sieger im KO-Baum und das Setzen des Board-Schlüssels aus dem Admin-Bereich.
+Für ein neues Projekt die drei Dateien in `supabase/migrations/` der Reihe nach im **SQL Editor** ausführen.
+
+Danach in Supabase von Hand (geht nicht per SQL):
+1. **Authentication → Sign In / Providers:** „Allow new users to sign up“ ausschalten. Sonst kann sich jeder registrieren und hätte Admin-Rechte.
+2. **Authentication → Users → Add user:** Admin-Account mit „Auto Confirm User“ anlegen.
 
 ## 2. Lokal starten
 
