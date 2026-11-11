@@ -1,0 +1,251 @@
+/*
+ * SC Fornsbach × Milchhäusle
+ * Grundton dunkles Marineblau, Akzente aus Wappenblau und Stern-Rot.
+ * Zahlen (Restpunkte, Legs, Averages) in Barlow Condensed wie auf einer Anzeigetafel.
+ */
+:root {
+	--navy-950: #050d1b;
+	--navy-900: #0a1a33;
+	--navy-850: #0d2141;
+	--navy-800: #11294f;
+	--navy-700: #18386a;
+	--navy-600: #22508f;
+
+	--blue: #3b82f0; /* Wappenblau, aufgehellt für dunklen Grund */
+	--blue-strong: #1a56c4; /* Wappenblau original */
+	--red: #ec2330; /* Milchhäusle-Stern */
+	--green: #22a865; /* grünes Feld der Dartscheibe: Checkout */
+	--gold: #f2c14e; /* Sieger */
+
+	--text: #f2f5fa;
+	--text-2: #c4d0e4;
+	--muted: #8ea3c4;
+	--line: rgba(142, 163, 196, 0.16);
+	--line-strong: rgba(142, 163, 196, 0.32);
+
+	--font: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-num: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
+
+	--r-lg: 18px;
+	--r-md: 10px;
+	--r-sm: 6px;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+html,
+body {
+	margin: 0;
+	min-height: 100%;
+}
+
+body {
+	background: var(--navy-900);
+	background-image: radial-gradient(1400px 700px at 50% -20%, var(--navy-700) 0%, transparent 60%);
+	background-attachment: fixed;
+	color: var(--text);
+	font-family: var(--font);
+	font-size: 16px;
+	line-height: 1.5;
+	-webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+	margin: 0 0 0.5em;
+	line-height: 1.15;
+	font-weight: 700;
+}
+
+h2 {
+	font-size: 1.35rem;
+}
+
+h3 {
+	font-size: 1.05rem;
+}
+
+a {
+	color: var(--blue);
+}
+
+.num {
+	font-family: var(--font-num);
+	font-variant-numeric: tabular-nums;
+}
+
+.muted {
+	color: var(--muted);
+}
+
+.panel {
+	background: var(--navy-850);
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	padding: 1.25rem;
+}
+
+/* ---- Formulare & Buttons ---- */
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4em;
+	padding: 0.6em 1.1em;
+	border-radius: var(--r-md);
+	border: 1px solid var(--line-strong);
+	background: var(--navy-800);
+	color: var(--text);
+	font-weight: 600;
+	cursor: pointer;
+	text-decoration: none;
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+}
+
+.btn:hover:not(:disabled) {
+	background: var(--navy-700);
+}
+
+.btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.btn.primary {
+	background: var(--blue-strong);
+	border-color: var(--blue);
+}
+
+.btn.primary:hover:not(:disabled) {
+	background: var(--blue);
+}
+
+.btn.danger {
+	background: transparent;
+	border-color: rgba(236, 35, 48, 0.55);
+	color: #ff8a91;
+}
+
+.btn.danger:hover:not(:disabled) {
+	background: rgba(236, 35, 48, 0.15);
+}
+
+.btn.small {
+	padding: 0.35em 0.7em;
+	font-size: 0.9rem;
+}
+
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='number'],
+select,
+textarea {
+	width: 100%;
+	padding: 0.6em 0.75em;
+	border-radius: var(--r-md);
+	border: 1px solid var(--line-strong);
+	background: var(--navy-950);
+	color: var(--text);
+}
+
+textarea {
+	resize: vertical;
+}
+
+label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 0.3em;
+}
+
+:focus-visible {
+	outline: 3px solid var(--blue);
+	outline-offset: 2px;
+}
+
+/* ---- Tabellen ---- */
+
+table.data {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.95rem;
+}
+
+table.data th {
+	text-align: left;
+	font-weight: 600;
+	color: var(--muted);
+	font-size: 0.85rem;
+	padding: 0.45rem 0.5rem;
+	border-bottom: 1px solid var(--line-strong);
+}
+
+table.data td {
+	padding: 0.5rem;
+	border-bottom: 1px solid var(--line);
+}
+
+table.data td.n,
+table.data th.n {
+	text-align: right;
+	font-family: var(--font-num);
+	font-variant-numeric: tabular-nums;
+	font-size: 1.05rem;
+}
+
+.live-dot {
+	display: inline-block;
+	width: 0.55em;
+	height: 0.55em;
+	border-radius: 50%;
+	background: var(--red);
+	box-shadow: 0 0 0 0 rgba(236, 35, 48, 0.6);
+	animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+	70% {
+		box-shadow: 0 0 0 8px rgba(236, 35, 48, 0);
+	}
+	100% {
+		box-shadow: 0 0 0 0 rgba(236, 35, 48, 0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation: none !important;
+		transition: none !important;
+	}
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
