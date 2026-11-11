@@ -154,6 +154,17 @@
 	.r-F .match.p3 {
 		border-color: var(--line-strong);
 	}
+	/* Handy: Runden untereinander statt Baum */
+	@media (max-width: 700px) {
+		.bracket {
+			grid-template-columns: 1fr;
+			overflow: visible;
+			gap: 1.5rem;
+		}
+		.matches {
+			justify-content: flex-start;
+		}
+	}
 	.r-F .match {
 		border-color: rgba(242, 193, 78, 0.45);
 	}

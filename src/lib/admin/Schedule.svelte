@@ -141,7 +141,10 @@
 				Achtelfinale eintragen
 			</button>
 		{:else}
-			<p class="muted">Gerade gibt es nichts einzutragen.</p>
+			<p class="muted">
+				{#if koMatches.filter((m) => m.round === 'R16').every((m) => m.player_a && m.player_b)}Alle Achtelfinals sind
+					eingetragen.{:else}Gerade gibt es nichts Neues einzutragen.{/if}
+			</p>
 		{/if}
 
 		{#each standings.filter((s) => s.blocked || overridden.has(s.group.id)) as s (s.group.id)}

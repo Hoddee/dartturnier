@@ -11,7 +11,7 @@
 	import { clearBoardKey, loadBoardKey } from '$lib/board/config';
 	import { BackendError } from '$lib/data/backend';
 	import { store } from '$lib/data/store.svelte';
-	import { currentMatchForBoard, nameOf, roundLabel, upcomingForBoard } from '$lib/logic/derive';
+	import { currentMatchForBoard, koPlaceholders, nameOf, roundLabel, upcomingForBoard } from '$lib/logic/derive';
 	import type { Dart } from '$lib/engine/types';
 
 	const board = $derived(Number(page.params.nr));
@@ -145,6 +145,10 @@
 		return () => clearInterval(t);
 	});
 
+	const placeholders = $derived(koPlaceholders(store.view.groups.map((g) => g.id)));
+	const pairName = (m: { id: string; player_a: string | null; player_b: string | null }) =>
+		`${nameOf(players, m.player_a, placeholders[m.id]?.[0] ?? 'offen')} – ${nameOf(players, m.player_b, placeholders[m.id]?.[1] ?? 'offen')}`;
+
 	const scorerName = $derived(match?.scorer_id ? nameOf(players, match.scorer_id) : null);
 
 	function onDart(d: Dart) {
@@ -172,10 +176,9 @@
 		heldId = null;
 	}
 
+	let menuOpen = $state(false);
 	function leave() {
-		if (confirm('Scheibe verlassen? Die Eingabe auf diesem iPad wird beendet.')) {
-			void goto('/board');
-		}
+		menuOpen = true;
 	}
 
 	function resetKey() {
@@ -212,8 +215,22 @@
 				<span class="ok">Gespeichert</span>
 			{/if}
 		</div>
-		<button class="exit" onclick={leave} aria-label="Scheibe verlassen">⋯</button>
+		<button class="exit" onclick={leave} aria-label="Menü öffnen" aria-expanded={menuOpen}>⋯</button>
 	</header>
+
+	{#if menuOpen}
+		<div class="menu-backdrop" role="presentation" onclick={() => (menuOpen = false)}></div>
+		<div class="menu" role="dialog" aria-label="Menü">
+			<p class="muted">Scheibe {board}</p>
+			{#if pendingCount}
+				<p class="warn">Noch {pendingCount} Eingabe(n) nicht gesendet. Bitte erst warten, bis „Gespeichert“ erscheint.</p>
+			{/if}
+			<a class="btn" href="/">Zur Live-Seite</a>
+			<a class="btn" href="/board">Andere Scheibe wählen</a>
+			<button class="btn" onclick={resetKey}>Board-Schlüssel neu eingeben</button>
+			<button class="btn primary" onclick={() => (menuOpen = false)}>Zurück zum Spiel</button>
+		</div>
+	{/if}
 
 	{#if sync?.problem}
 		<p class="problem" role="status">{sync.problem}</p>
@@ -232,7 +249,7 @@
 					<p class="muted">Die nächsten Spiele warten noch auf ihre Spieler:</p>
 					<ul class="queue">
 						{#each upcoming as m (m.id)}
-							<li>{roundLabel(m)}: {nameOf(players, m.player_a, 'offen')} – {nameOf(players, m.player_b, 'offen')}</li>
+							<li>{roundLabel(m)}: {pairName(m)}</li>
 						{/each}
 					</ul>
 				{:else}
@@ -261,7 +278,7 @@
 						suchen, der die Darts eingibt.{/if}
 				</p>
 				{#if upcoming.length}
-					<p class="muted after">Danach: {nameOf(players, upcoming[0].player_a, 'offen')} – {nameOf(players, upcoming[0].player_b, 'offen')}</p>
+					<p class="muted after">Danach: {pairName(upcoming[0])}</p>
 				{/if}
 			</div>
 		{:else if !match.first_thrower_set}
@@ -278,7 +295,23 @@
 			</div>
 		{:else if sync}
 			<div class="play">
-				<Scoreboard state={sync.state} {names} />
+				<div class="left">
+					<Scoreboard state={sync.state} {names} ids={[match.player_a, match.player_b]} />
+					<div class="info">
+						<div><span class="muted">Leg</span> <strong class="num">{sync.state.currentLeg + 1}</strong></div>
+						<div>
+							<span class="muted">Anwurf</span>
+							<strong>{names[(match.first_thrower + sync.state.currentLeg) % 2]}</strong>
+						</div>
+						<div><span class="muted">Zähler</span> <strong>{scorerName ?? 'offen'}</strong></div>
+						{#if upcoming[0]}
+							<div class="next">
+								<span class="muted">Danach</span>
+								<strong>{pairName(upcoming[0])}</strong>
+							</div>
+						{/if}
+					</div>
+				</div>
 				<div class="pad">
 					<Keypad onDart={onDart} onUndo={onUndo} canUndo={sync.darts.length > 0} disabled={sync.state.finished || sync.fatal} />
 				</div>
@@ -463,6 +496,15 @@
 	.pad {
 		min-height: 0;
 	}
+	.left {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		min-height: 0;
+	}
+	.info {
+		display: none;
+	}
 	@media (orientation: landscape) and (min-width: 900px) {
 		.play {
 			grid-template-rows: none;
@@ -472,6 +514,60 @@
 			grid-template-columns: 1fr;
 			align-content: start;
 		}
+		.info {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 0.5rem 1rem;
+			padding: 0.8rem 1rem;
+			border-radius: var(--r-lg);
+			border: 1px solid var(--line);
+			background: var(--navy-900);
+			font-size: 0.95rem;
+		}
+		.info div {
+			display: flex;
+			flex-direction: column;
+			min-width: 0;
+		}
+		.info strong {
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		.info .next {
+			grid-column: 1 / -1;
+		}
+	}
+	.menu-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(5, 13, 27, 0.6);
+		z-index: 40;
+	}
+	.menu {
+		position: fixed;
+		top: 4rem;
+		right: 0.9rem;
+		z-index: 41;
+		width: min(20rem, calc(100vw - 1.8rem));
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 1rem;
+		border-radius: var(--r-lg);
+		background: var(--navy-850);
+		border: 1px solid var(--line-strong);
+		box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+	}
+	.menu p {
+		margin: 0 0 0.25rem;
+	}
+	.menu .btn {
+		padding: 0.85rem;
+	}
+	.menu .warn {
+		color: var(--gold);
+		font-size: 0.9rem;
 	}
 	.flash {
 		position: absolute;

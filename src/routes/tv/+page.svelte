@@ -36,10 +36,22 @@
 	let now = $state(new Date());
 	const slide = $derived(slides[index % Math.max(1, slides.length)]);
 
+	// Die Ansicht ist für 1920 × 1080 gebaut und wird auf jede Bildschirmgröße skaliert,
+	// damit sie auf jedem Fernseher/Beamer gleich aussieht.
+	const STAGE_W = 1920;
+	const STAGE_H = 1080;
+	let scale = $state(1);
+	function fit() {
+		scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H);
+	}
+
 	onMount(() => {
+		fit();
+		window.addEventListener('resize', fit);
 		const rot = setInterval(() => (index = (index + 1) % Math.max(1, slides.length)), ROTATE_MS);
 		const clock = setInterval(() => (now = new Date()), 1000 * 15);
 		return () => {
+			window.removeEventListener('resize', fit);
 			clearInterval(rot);
 			clearInterval(clock);
 		};
@@ -50,12 +62,14 @@
 	}
 </script>
 
-<div class="tv">
+<div class="viewport">
+<div class="tv" style="transform: translate(-50%, -50%) scale({scale})">
 	<StatusBar />
 	<header>
 		<Logos size={4} />
 		<h1>{store.data.settings.name}</h1>
 		<div class="right">
+			<a class="btn small fs" href="/">Zurück</a>
 			<button class="btn small fs" onclick={fullscreen}>Vollbild</button>
 			<span class="clock num">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span>
 		</div>
@@ -93,14 +107,23 @@
 		{/if}
 	</section>
 </div>
+</div>
 
 <HighlightOverlay variant="stage" />
 
 <style>
+	.viewport {
+		position: fixed;
+		inset: 0;
+		overflow: hidden;
+	}
 	.tv {
-		min-height: 100vh;
-		max-width: 1880px;
-		margin: 0 auto;
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		width: 1920px;
+		height: 1080px;
+		transform-origin: center;
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
@@ -138,11 +161,6 @@
 		display: grid;
 		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: 1rem;
-	}
-	@media (max-width: 1300px) {
-		.boards {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
 	}
 	.boards :global(.board .rest) {
 		font-size: 4.4rem;
@@ -204,11 +222,6 @@
 		display: grid;
 		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: 1rem;
-	}
-	@media (max-width: 1300px) {
-		.groups {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
 	}
 	.groups :global(table.data) {
 		font-size: 1.1rem;

@@ -4,12 +4,14 @@
 	import { threeDartAverage } from '$lib/engine/match';
 	import type { MatchState, PlayerSlot } from '$lib/engine/types';
 	import { formatAverage } from '$lib/logic/derive';
+	import Avatar from '$lib/components/Avatar.svelte';
 
 	interface Props {
 		state: MatchState;
 		names: [string, string];
+		ids?: [string | null, string | null];
 	}
-	let { state, names }: Props = $props();
+	let { state, names, ids = [null, null] }: Props = $props();
 
 	function lastVisit(slot: PlayerSlot) {
 		return [...state.visits].reverse().find((v) => v.player === slot && v.leg === state.currentLeg) ?? null;
@@ -24,6 +26,7 @@
 		{@const lv = lastVisit(slot)}
 		<section class="p" class:active>
 			<div class="top">
+				{#if ids[slot]}<Avatar playerId={ids[slot]} size={2.4} />{/if}
 				<h2>{names[slot]}</h2>
 				<span class="legs num" title="Gewonnene Legs">{state.legsWon[slot]}</span>
 			</div>

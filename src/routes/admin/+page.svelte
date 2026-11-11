@@ -75,9 +75,11 @@
 <StatusBar />
 <header class="top">
 	<div class="inner">
-		<a href="/" class="brand"><Logos size={2.6} /> <strong>Turnierleitung</strong></a>
+		<a href="/" class="brand" title="Zur Live-Seite"><Logos size={2.6} /> <strong>Turnierleitung</strong></a>
+		<a class="btn small ghost" href="/">Live-Seite</a>
+		<a class="btn small ghost hide-sm" href="/tv" target="_blank" rel="noopener">TV-Ansicht</a>
 		{#if session}
-			<span class="who muted">{session.email}</span>
+			<span class="who muted hide-sm">{session.email}</span>
 			<button class="btn small" onclick={() => store.backend.signOut()}>Abmelden</button>
 		{/if}
 	</div>
@@ -99,6 +101,7 @@
 			<input id="pw" type="password" autocomplete="current-password" bind:value={password} required={!store.demo} />
 			{#if loginError}<p class="error" role="alert">{loginError}</p>{/if}
 			<button class="btn primary go" type="submit" disabled={loggingIn}>{loggingIn ? 'Anmelden …' : 'Anmelden'}</button>
+			<p class="backline"><a href="/">Zurück zur Live-Seite</a></p>
 		</form>
 	{:else}
 		<div class="summary">
@@ -156,6 +159,31 @@
 	}
 	.who {
 		font-size: 0.9rem;
+	}
+	.ghost {
+		background: transparent;
+	}
+	.backline {
+		text-align: center;
+		margin: 1rem 0 0;
+		font-size: 0.9rem;
+	}
+	.backline a {
+		color: var(--text-2);
+	}
+	@media (max-width: 640px) {
+		.hide-sm {
+			display: none;
+		}
+		.brand strong {
+			display: none;
+		}
+		.top .inner {
+			gap: 0.5rem;
+		}
+		.summary {
+			gap: 0.5rem 1.25rem;
+		}
 	}
 	main.inner {
 		padding-top: 1.5rem;

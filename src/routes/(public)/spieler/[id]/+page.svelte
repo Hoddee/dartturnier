@@ -4,6 +4,7 @@
 	import { formatAverage, matchState, nameOf, roundLabel } from '$lib/logic/derive';
 	import { threeDartAverage } from '$lib/engine/match';
 	import Avatar from '$lib/components/Avatar.svelte';
+	import BackLink from '$lib/components/BackLink.svelte';
 
 	const id = $derived(page.params.id ?? '');
 	const player = $derived(store.view.players[id]);
@@ -37,6 +38,8 @@
 	);
 </script>
 
+<BackLink fallback="/statistik" />
+
 {#if !player}
 	<p class="muted">Spieler nicht gefunden. <a href="/statistik">Zur Spielerliste</a></p>
 {:else}
@@ -45,8 +48,14 @@
 		<div>
 		<h2>{player.name}</h2>
 		<p class="muted">
-			{#if group}Gruppe {group.id}{#if standing} · Platz {standing.rank} · {standing.points} Punkte{/if}{/if}
-			{#if totals}· {totals.matchesWon} von {totals.matchesPlayed} Spielen gewonnen{/if}
+			{[
+				group ? `Gruppe ${group.id}` : '',
+				standing ? `Platz ${standing.rank}` : '',
+				standing ? `${standing.points} Punkte` : '',
+				totals ? `${totals.matchesWon} von ${totals.matchesPlayed} Spielen gewonnen` : ''
+			]
+				.filter(Boolean)
+				.join(' · ')}
 		</p>
 		</div>
 	</header>
@@ -107,6 +116,7 @@
 
 <style>
 	.head {
+		margin-top: 0.75rem;
 		display: flex;
 		align-items: center;
 		gap: 1.25rem;

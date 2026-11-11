@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import Logos from '$lib/components/Logos.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
+	import BackLink from '$lib/components/BackLink.svelte';
 	import { loadBoardKey, saveBoardKey } from '$lib/board/config';
 	import { store } from '$lib/data/store.svelte';
 	import { BOARD_COUNT } from '$lib/logic/plans';
@@ -41,6 +42,7 @@
 </script>
 
 <StatusBar />
+<nav class="top"><BackLink fallback="/" label="Zur Live-Seite" /></nav>
 <main>
 	<Logos size={4} />
 	<h1>Scheibe einrichten</h1>
@@ -75,10 +77,15 @@
 </main>
 
 <style>
+	.top {
+		max-width: 34rem;
+		margin: 0 auto;
+		padding: 1rem 1.25rem 0;
+	}
 	main {
 		max-width: 34rem;
 		margin: 0 auto;
-		padding: 2.5rem 1.25rem;
+		padding: 1rem 1.25rem 2.5rem;
 		display: flex;
 		flex-direction: column;
 		align-items: center;

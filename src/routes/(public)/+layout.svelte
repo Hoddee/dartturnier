@@ -144,6 +144,14 @@
 		color: var(--muted);
 	}
 	@media (max-width: 560px) {
+		nav a {
+			padding: 0.6rem 0.55rem;
+			font-size: 0.92rem;
+		}
+		nav .inner {
+			gap: 0;
+			justify-content: space-between;
+		}
 		.title .muted {
 			display: none;
 		}

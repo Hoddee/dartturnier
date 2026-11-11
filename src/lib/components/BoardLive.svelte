@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { store } from '$lib/data/store.svelte';
-	import { currentMatchForBoard, koPlaceholders, matchState, nameOf, roundLabel, upcomingForBoard, formatAverage } from '$lib/logic/derive';
+	import { currentMatchForBoard, formatTime, koPlaceholders, matchState, nameOf, plannedStart, roundLabel, upcomingForBoard, formatAverage } from '$lib/logic/derive';
 	import { checkoutLabels } from '$lib/engine/checkout';
 	import { formatDart } from '$lib/engine/dart';
 	import { threeDartAverage } from '$lib/engine/match';
@@ -44,7 +44,7 @@
 	const match = $derived(held ?? current);
 	const finishedHold = $derived(!!held && held.status === 'finished');
 	const next = $derived(upcomingForBoard(store.data.matches, board, 1)[0] ?? null);
-	const state = $derived(match ? matchState(match, store.data.dartsByMatch[match.id]) : null);
+	const ms = $derived(match ? matchState(match, store.data.dartsByMatch[match.id]) : null);
 	const players = $derived(store.view.players);
 	const placeholders = $derived(koPlaceholders(store.view.groups.map((g) => g.id)));
 	const live = $derived(match?.status === 'live' && match.first_thrower_set);
@@ -54,11 +54,11 @@
 	let legTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastLegs: { id: string; legs: [number, number] } | null = null;
 	$effect(() => {
-		if (!match || !state) return;
-		const legs: [number, number] = [state.legsWon[0], state.legsWon[1]];
+		if (!match || !ms) return;
+		const legs: [number, number] = [ms.legsWon[0], ms.legsWon[1]];
 		if (lastLegs && lastLegs.id === match.id) {
 			const slot = legs[0] > lastLegs.legs[0] ? 0 : legs[1] > lastLegs.legs[1] ? 1 : null;
-			if (slot !== null && !state.finished) {
+			if (slot !== null && !ms.finished) {
 				legFlash = slot;
 				clearTimeout(legTimer);
 				legTimer = setTimeout(() => (legFlash = null), 2600);
@@ -68,8 +68,8 @@
 	});
 
 	function lastVisitText(slot: 0 | 1): string {
-		if (!state) return '';
-		const v = [...state.visits].reverse().find((x) => x.player === slot && x.leg === state!.currentLeg);
+		if (!ms) return '';
+		const v = [...ms.visits].reverse().find((x) => x.player === slot && x.leg === ms!.currentLeg);
 		if (!v) return '';
 		return v.bust ? 'Bust' : String(v.points);
 	}
@@ -84,37 +84,42 @@
 				<span class="status done">Beendet</span>
 			{:else if live}
 				<span class="status"><span class="live-dot"></span> Live</span>
+			{:else if match.status === 'live'}
+				<span class="status muted">Ausbullen</span>
 			{:else}
-				<span class="status muted">Gleich geht's los</span>
+				<span class="status muted">Als Nächstes{#if plannedStart(match, store.data.settings, store.data.matches)}, {formatTime(plannedStart(match, store.data.settings, store.data.matches))}{/if}</span>
 			{/if}
 		{/if}
 	</header>
 
-	{#if match && state}
+	{#if match && ms}
 		<div class="players">
 			{#each [0, 1] as const as slot (slot)}
 				{@const pid = slot === 0 ? match.player_a : match.player_b}
-				{@const active = live && !state.finished && state.currentPlayer === slot}
-				{@const rest = state.remaining[slot]}
-				{@const co = active && rest <= 170 ? checkoutLabels(rest, 3 - state.currentVisit.length) : null}
+				{@const active = live && !ms.finished && ms.currentPlayer === slot}
+				{@const rest = ms.remaining[slot]}
+				{@const co = active && rest <= 170 ? checkoutLabels(rest, 3 - ms.currentVisit.length) : null}
 				{@const won = finishedHold && match.winner_id === pid}
 				<div class="player" class:active class:legwon={legFlash === slot} class:won class:lost={finishedHold && !won}>
 					<div class="name-row">
 						<Avatar playerId={pid} size={large ? 3 : 2.2} />
 						<a class="name" href="/spieler/{pid}">{nameOf(players, pid)}</a>
-						<span class="legs num" aria-label="Legs">{state.legsWon[slot]}</span>
+						<span class="legs num" aria-label="Legs">{ms.legsWon[slot]}</span>
 					</div>
 					{#if finishedHold}
 						<div class="rest num result">{won ? 'Sieg' : ''}</div>
+					{:else if !live}
+						{@const ready = slot === 0 ? match.ready_a : match.ready_b}
+						<div class="waiting" class:ready>{ready ? 'Bereit' : 'Noch nicht bereit'}</div>
 					{:else}
-						<div class="rest num">{live ? rest : '501'}</div>
+						<div class="rest num">{rest}</div>
 					{/if}
 					{#if legFlash === slot}<div class="legbadge num">Leg gewonnen</div>{/if}
-					<div class="meta">
-						<span class="num">Ø {formatAverage(threeDartAverage(state.stats[slot]))}</span>
-						{#if active && state.currentVisit.length}
+					<div class="meta" class:hidden={!live && !finishedHold}>
+						<span class="num">Ø {formatAverage(threeDartAverage(ms.stats[slot]))}</span>
+						{#if active && ms.currentVisit.length}
 							<span class="visit num">
-								{#each state.currentVisit as d, i (i)}<span>{formatDart(d)}</span>{/each}
+								{#each ms.currentVisit as d, i (i)}<span>{formatDart(d)}</span>{/each}
 							</span>
 						{:else if lastVisitText(slot)}
 							<span class="muted">zuletzt {lastVisitText(slot)}</span>
@@ -127,7 +132,7 @@
 			{/each}
 		</div>
 		<footer class="muted">
-			<span>First to {match.legs_to_win}{#if !finishedHold} · Leg {state.currentLeg + 1}{/if}</span>
+			<span>First to {match.legs_to_win}{#if !finishedHold} · Leg {ms.currentLeg + 1}{/if}</span>
 			<span class="scorer">Zähler: {match.scorer_id ? nameOf(players, match.scorer_id) : 'offen'}</span>
 		</footer>
 	{:else}
@@ -261,6 +266,26 @@
 	}
 	.status.done {
 		color: var(--gold);
+	}
+	.waiting {
+		margin: 0.9rem 0 0.4rem;
+		font-size: 1.05rem;
+		color: var(--muted);
+	}
+	.waiting.ready {
+		color: #6fe3a8;
+		font-weight: 600;
+	}
+	.large .waiting {
+		font-size: 1.35rem;
+	}
+	.meta.hidden {
+		display: none;
+	}
+	@media (max-width: 480px) {
+		.name-row :global(.avatar) {
+			display: none;
+		}
 	}
 	.name {
 		color: var(--text);

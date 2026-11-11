@@ -4,7 +4,8 @@
 
 {#if store.demo}
 	<div class="bar demo">
-		Demo-Modus: Die Daten liegen nur in diesem Browser. Board-Schlüssel ist <strong>demo</strong>
+		<span>Demo-Modus: Daten nur in diesem Browser</span>
+		<span>Board-Schlüssel: <strong>demo</strong></span>
 	</div>
 {/if}
 {#if store.status === 'error'}
@@ -28,6 +29,7 @@
 		flex-wrap: wrap;
 	}
 	.demo {
+		gap: 0.25rem 1rem;
 		background: rgba(242, 193, 78, 0.14);
 		color: var(--gold);
 	}
