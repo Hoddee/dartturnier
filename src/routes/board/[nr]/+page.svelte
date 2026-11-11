@@ -5,6 +5,7 @@
 	import Logos from '$lib/components/Logos.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import Keypad from '$lib/board/Keypad.svelte';
+	import Avatar from '$lib/components/Avatar.svelte';
 	import Scoreboard from '$lib/board/Scoreboard.svelte';
 	import { BoardSync } from '$lib/board/sync.svelte';
 	import { clearBoardKey, loadBoardKey } from '$lib/board/config';
@@ -108,25 +109,57 @@
 	const firstThrower = (slot: 0 | 1) =>
 		match && key && act(() => store.backend.boardSetFirstThrower(key!, match!.id, slot));
 
-	// Kurze Rückmeldungen (Bust, Leg gewonnen)
-	let flash = $state<{ text: string; tone: 'bust' | 'leg' } | null>(null);
+	// Kurze Rückmeldungen (Bust, 180)
+	let flash = $state<{ text: string; tone: 'bust' | 'max' } | null>(null);
 	let flashTimer: ReturnType<typeof setTimeout> | undefined;
-	function showFlash(text: string, tone: 'bust' | 'leg') {
+	function showFlash(text: string, tone: 'bust' | 'max') {
 		flash = { text, tone };
 		clearTimeout(flashTimer);
-		flashTimer = setTimeout(() => (flash = null), tone === 'leg' ? 2200 : 1300);
+		flashTimer = setTimeout(() => (flash = null), tone === 'max' ? 2000 : 1300);
 	}
+
+	// Leg gewonnen: große Animation
+	let legWin = $state<{ slot: 0 | 1; legs: [number, number]; key: number } | null>(null);
+	let legTimer: ReturnType<typeof setTimeout> | undefined;
+	function showLegWin(slot: 0 | 1, legs: [number, number]) {
+		legWin = { slot, legs, key: Date.now() };
+		flash = null;
+		clearTimeout(legTimer);
+		legTimer = setTimeout(() => (legWin = null), 2800);
+	}
+
+	// Siegerbildschirm: nach 30 Sekunden automatisch zum nächsten Spiel
+	const AUTO_NEXT_S = 30;
+	let countdown = $state(AUTO_NEXT_S);
+	$effect(() => {
+		const waiting = winnerSlot !== null && pendingCount === 0;
+		if (!waiting) {
+			countdown = AUTO_NEXT_S;
+			return;
+		}
+		const started = Date.now();
+		const t = setInterval(() => {
+			countdown = Math.max(0, AUTO_NEXT_S - Math.floor((Date.now() - started) / 1000));
+			if (countdown === 0) next();
+		}, 250);
+		return () => clearInterval(t);
+	});
+
+	const scorerName = $derived(match?.scorer_id ? nameOf(players, match.scorer_id) : null);
 
 	function onDart(d: Dart) {
 		if (!sync) return;
 		const before = sync.state;
 		if (!sync.add(d)) return;
 		const after = sync.state;
-		if (after.visits.length > before.visits.length && after.visits[after.visits.length - 1].bust) {
-			showFlash('Bust', 'bust');
-		} else if (after.legResults.length > before.legResults.length && !after.finished) {
+		const lastVisit = after.visits.length > before.visits.length ? after.visits[after.visits.length - 1] : null;
+		if (after.legResults.length > before.legResults.length && !after.finished) {
 			const w = after.legResults[after.legResults.length - 1].winner;
-			showFlash(`Leg an ${names[w]}`, 'leg');
+			showLegWin(w, [after.legsWon[0], after.legsWon[1]]);
+		} else if (lastVisit?.bust) {
+			showFlash('Bust', 'bust');
+		} else if (lastVisit?.points === 180) {
+			showFlash('180!', 'max');
 		}
 	}
 
@@ -164,6 +197,12 @@
 			<strong>Scheibe {board}</strong>
 			{#if match}<span class="muted">{roundLabel(match)} · First to {match.legs_to_win}</span>{/if}
 		</div>
+		{#if match}
+			<div class="scorer" class:open={!scorerName}>
+				<span class="muted">Zähler</span>
+				<strong>{scorerName ?? 'offen'}</strong>
+			</div>
+		{/if}
 		<div class="sync" aria-live="polite">
 			{#if sync?.fatal}
 				<button class="btn small danger" onclick={resetKey}>Neu einrichten</button>
@@ -206,7 +245,9 @@
 				<div class="duo">
 					{#each [0, 1] as const as slot (slot)}
 						{@const isReady = slot === 0 ? match.ready_a : match.ready_b}
+						{@const pid = slot === 0 ? match.player_a : match.player_b}
 						<div class="who" class:isReady>
+							<Avatar playerId={pid} size={6.5} ring={isReady} />
 							<h2>{names[slot]}</h2>
 							<button class="btn readybtn" class:primary={!isReady} disabled={isReady || busy} onclick={() => ready(slot)}>
 								{isReady ? 'Bereit ✓' : 'Bereit'}
@@ -215,6 +256,10 @@
 						{#if slot === 0}<span class="vs muted">gegen</span>{/if}
 					{/each}
 				</div>
+				<p class="scorer-note">
+					{#if scorerName}<strong>{scorerName}</strong> zählt dieses Spiel und gibt die Darts ein.{:else}Zähler offen: Bitte jemanden
+						suchen, der die Darts eingibt.{/if}
+				</p>
 				{#if upcoming.length}
 					<p class="muted after">Danach: {nameOf(players, upcoming[0].player_a, 'offen')} – {nameOf(players, upcoming[0].player_b, 'offen')}</p>
 				{/if}
@@ -243,6 +288,24 @@
 				<div class="flash {flash.tone}" role="status">{flash.text}</div>
 			{/if}
 
+			{#if legWin}
+				{#key legWin.key}
+					<button class="legwin" onclick={() => (legWin = null)} aria-label="Leg gewonnen, antippen zum Schließen">
+						<span class="ring" aria-hidden="true"></span>
+						<span class="card">
+							<Avatar playerId={legWin.slot === 0 ? match.player_a : match.player_b} size={5.5} ring />
+							<span class="t">Leg gewonnen</span>
+							<span class="n">{names[legWin.slot]}</span>
+							<span class="score num">
+								<span class:hl={legWin.slot === 0}>{legWin.legs[0]}</span>
+								<span class="sep">:</span>
+								<span class:hl={legWin.slot === 1}>{legWin.legs[1]}</span>
+							</span>
+						</span>
+					</button>
+				{/key}
+			{/if}
+
 			{#if winnerSlot !== null}
 				<div class="overlay" role="dialog" aria-modal="true" aria-label="Spiel beendet">
 					<div class="win">
@@ -252,9 +315,10 @@
 						<div class="actions">
 							<button class="btn" onclick={onUndo}>Letzten Dart rückgängig</button>
 							<button class="btn primary" onclick={next} disabled={pendingCount > 0}>
-								{pendingCount > 0 ? 'Wird gespeichert …' : 'Weiter zum nächsten Spiel'}
+								{pendingCount > 0 ? 'Wird gespeichert …' : `Weiter zum nächsten Spiel (${countdown})`}
 							</button>
 						</div>
+						<div class="countdown" aria-hidden="true"><span style="width: {(countdown / AUTO_NEXT_S) * 100}%"></span></div>
 					</div>
 				</div>
 			{/if}
@@ -424,6 +488,140 @@
 	}
 	.flash.bust {
 		background: var(--red);
+	}
+	.flash.max {
+		background: linear-gradient(135deg, var(--red), #a3161f);
+		font-size: 4.5rem;
+	}
+	.scorer {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		line-height: 1.15;
+		font-size: 0.95rem;
+	}
+	.scorer .muted {
+		font-size: 0.75rem;
+	}
+	.scorer.open strong {
+		color: var(--gold);
+	}
+	.scorer-note {
+		margin: 0.25rem 0 0;
+		font-size: 1.1rem;
+		color: var(--text-2);
+	}
+	.who {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+	.who h2 {
+		margin-top: 0.75rem;
+	}
+	.legwin {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		background: rgba(5, 13, 27, 0.72);
+		border: 0;
+		color: var(--text);
+		cursor: pointer;
+		animation: lw-fade 2.8s ease forwards;
+	}
+	.legwin .ring {
+		position: absolute;
+		width: 34rem;
+		height: 34rem;
+		max-width: 90vw;
+		max-height: 90vw;
+		border-radius: 50%;
+		border: 6px solid var(--gold);
+		opacity: 0;
+		animation: lw-ring 1.2s ease-out 0.1s;
+	}
+	.legwin .card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 2rem 3rem;
+		border-radius: 24px;
+		background: radial-gradient(400px 200px at 50% 0%, rgba(242, 193, 78, 0.35), transparent 70%), var(--navy-850);
+		border: 2px solid var(--gold);
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+		animation: lw-pop 0.55s cubic-bezier(0.2, 1.5, 0.4, 1);
+	}
+	.legwin .t {
+		color: var(--gold);
+		font-weight: 700;
+		font-size: 1.3rem;
+		margin-top: 0.5rem;
+	}
+	.legwin .n {
+		font-size: 2.6rem;
+		font-weight: 800;
+	}
+	.legwin .score {
+		display: flex;
+		gap: 0.6rem;
+		font-size: 4.5rem;
+		font-weight: 800;
+		line-height: 1;
+		color: var(--text-2);
+	}
+	.legwin .score .hl {
+		color: var(--gold);
+		display: inline-block;
+		animation: lw-count 0.7s cubic-bezier(0.2, 1.8, 0.4, 1) 0.35s both;
+	}
+	@keyframes lw-fade {
+		0%,
+		85% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+		}
+	}
+	@keyframes lw-pop {
+		from {
+			transform: scale(0.5) translateY(30px);
+			opacity: 0;
+		}
+	}
+	@keyframes lw-ring {
+		0% {
+			transform: scale(0.3);
+			opacity: 0.9;
+		}
+		100% {
+			transform: scale(1.2);
+			opacity: 0;
+		}
+	}
+	@keyframes lw-count {
+		0% {
+			transform: scale(0.2) rotate(-12deg);
+		}
+		100% {
+			transform: scale(1);
+		}
+	}
+	.countdown {
+		margin: 1.25rem auto 0;
+		width: min(26rem, 80%);
+		height: 0.4rem;
+		border-radius: 99px;
+		background: var(--navy-800);
+		overflow: hidden;
+	}
+	.countdown span {
+		display: block;
+		height: 100%;
+		background: var(--blue);
+		transition: width 0.25s linear;
 	}
 	.flash.leg {
 		background: var(--blue-strong);

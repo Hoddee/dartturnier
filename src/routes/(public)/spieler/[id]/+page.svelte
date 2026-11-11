@@ -3,6 +3,7 @@
 	import { store } from '$lib/data/store.svelte';
 	import { formatAverage, matchState, nameOf, roundLabel } from '$lib/logic/derive';
 	import { threeDartAverage } from '$lib/engine/match';
+	import Avatar from '$lib/components/Avatar.svelte';
 
 	const id = $derived(page.params.id ?? '');
 	const player = $derived(store.view.players[id]);
@@ -40,11 +41,14 @@
 	<p class="muted">Spieler nicht gefunden. <a href="/statistik">Zur Spielerliste</a></p>
 {:else}
 	<header class="head">
+		<Avatar playerId={id} size={7} ring />
+		<div>
 		<h2>{player.name}</h2>
 		<p class="muted">
 			{#if group}Gruppe {group.id}{#if standing} · Platz {standing.rank} · {standing.points} Punkte{/if}{/if}
 			{#if totals}· {totals.matchesWon} von {totals.matchesPlayed} Spielen gewonnen{/if}
 		</p>
+		</div>
 	</header>
 
 	{#if tiles.length}
@@ -102,12 +106,18 @@
 {/if}
 
 <style>
+	.head {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+		margin-bottom: 1.25rem;
+	}
 	.head h2 {
 		font-size: 2rem;
 		margin-bottom: 0.15rem;
 	}
 	.head p {
-		margin: 0 0 1.25rem;
+		margin: 0;
 	}
 	.tiles {
 		display: grid;

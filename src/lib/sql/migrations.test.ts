@@ -73,11 +73,16 @@ beforeAll(async () => {
 		insert into matches (id, stage, group_id, round, player_a, player_b, board, queue_index, legs_to_win)
 		values ('A-1-1', 'group', 'A', '1',
 			'00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b', 1, 0, 1);
-		insert into matches (id, stage, round, legs_to_win) values ('F-1', 'ko', 'F', 1);
+		insert into matches (id, stage, round, legs_to_win) values ('F-1', 'ko', 'F', 1), ('P3-1', 'ko', 'P3', 1);
+		insert into matches (id, stage, round, legs_to_win) values ('R16-X', 'ko', 'R16', 1);
 		insert into matches (id, stage, round, player_a, player_b, legs_to_win, next_match_id, next_slot)
 		values
 			('SF-1', 'ko', 'SF', '00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b', 1, 'F-1', 0),
 			('SF-2', 'ko', 'SF', '00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-00000000000d', 1, 'F-1', 1);
+		update matches set loser_next_match_id = 'P3-1', loser_next_slot = 0 where id = 'SF-1';
+		update matches set loser_next_match_id = 'P3-1', loser_next_slot = 1 where id = 'SF-2';
+		-- Der Verlierer von SF-2 zählt (nur zum Testen) das Match R16-X
+		update matches set scorer_from_loser_of = 'SF-2' where id = 'R16-X';
 	`);
 }, 60_000);
 
@@ -182,10 +187,18 @@ describe('Supabase-Migrationen', () => {
 			f = await match('F-1');
 			expect(f.player_b).toBe('00000000-0000-0000-0000-00000000000d');
 
+			// Halbfinal-Verlierer ins Spiel um Platz 3, Verlierer wird Zähler
+			const p3 = await match('P3-1');
+			expect(p3.player_a).toBe('00000000-0000-0000-0000-00000000000b');
+			expect(p3.player_b).toBe('00000000-0000-0000-0000-00000000000c');
+			expect((await match('R16-X')).scorer_id).toBe('00000000-0000-0000-0000-00000000000c');
+
 			await db.query(`select board_undo_dart($1, 'SF-2', 1, 0::smallint, 0::smallint)`, [KEY]);
 			f = await match('F-1');
 			expect(f.player_b).toBeNull();
 			expect(f.player_a).toBe('00000000-0000-0000-0000-00000000000a');
+			expect((await match('P3-1')).player_b).toBeNull();
+			expect((await match('R16-X')).scorer_id).toBeNull();
 		});
 	});
 

@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { store } from '$lib/data/store.svelte';
 	import { KO_ROUND_LABELS, type KoRound } from '$lib/tournament/knockout';
+	import { DEFAULT_SETTINGS, type KoTimeKey } from '$lib/db-types';
 	import { ui } from './ui.svelte';
 
 	const ALL_TIEBREAKERS: { key: string; label: string }[] = [
@@ -10,13 +11,25 @@
 		{ key: 'legsWon', label: 'Gewonnene Legs' },
 		{ key: 'average', label: 'Average' }
 	];
-	const ROUNDS: KoRound[] = ['R16', 'QF', 'SF', 'F'];
+	const ROUNDS: KoRound[] = ['R16', 'QF', 'SF', 'P3', 'F'];
+	const TIME_KEYS: { key: KoTimeKey; label: string }[] = [
+		{ key: 'R16a', label: 'Achtelfinale, 1. Welle' },
+		{ key: 'R16b', label: 'Achtelfinale, 2. Welle' },
+		{ key: 'QF', label: 'Viertelfinale' },
+		{ key: 'SF', label: 'Halbfinale' },
+		{ key: 'P3', label: 'Spiel um Platz 3' },
+		{ key: 'F', label: 'Finale' }
+	];
 
 	const s = $derived(store.data.settings);
 	let name = $state('');
 	let groupLegs = $state(3);
 	let pointsPerWin = $state(2);
-	let koLegs = $state<Record<KoRound, number>>({ R16: 4, QF: 4, SF: 5, F: 6 });
+	let koLegs = $state<Record<KoRound, number>>({ ...DEFAULT_SETTINGS.ko_legs_to_win });
+	let eventDate = $state(DEFAULT_SETTINGS.event_date);
+	let startTime = $state(DEFAULT_SETTINGS.start_time);
+	let slotMinutes = $state(DEFAULT_SETTINGS.slot_minutes);
+	let koTimes = $state<Record<KoTimeKey, string>>({ ...DEFAULT_SETTINGS.ko_times });
 	let tiebreakers = $state<string[]>([]);
 	let boardKey = $state('');
 	let confirmText = $state('');
@@ -32,7 +45,11 @@
 		name = s.name;
 		groupLegs = s.group_legs_to_win;
 		pointsPerWin = s.points_per_win;
-		koLegs = { ...s.ko_legs_to_win };
+		koLegs = { ...DEFAULT_SETTINGS.ko_legs_to_win, ...s.ko_legs_to_win };
+		eventDate = s.event_date ?? DEFAULT_SETTINGS.event_date;
+		startTime = s.start_time ?? DEFAULT_SETTINGS.start_time;
+		slotMinutes = s.slot_minutes ?? DEFAULT_SETTINGS.slot_minutes;
+		koTimes = { ...DEFAULT_SETTINGS.ko_times, ...(s.ko_times ?? {}) };
 		tiebreakers = [...s.tiebreakers];
 	}
 
@@ -59,7 +76,11 @@
 				group_legs_to_win: groupLegs,
 				points_per_win: pointsPerWin,
 				ko_legs_to_win: koLegs,
-				tiebreakers
+				tiebreakers,
+				event_date: eventDate,
+				start_time: startTime,
+				slot_minutes: slotMinutes,
+				ko_times: koTimes
 			});
 			// Noch nicht begonnene Spiele übernehmen die neuen Leg-Zahlen
 			for (const m of openGroup) {
@@ -113,6 +134,34 @@
 			<div>
 				<label for="ko-{r}">{KO_ROUND_LABELS[r]}</label>
 				<input id="ko-{r}" type="number" min="1" max="15" bind:value={koLegs[r]} />
+			</div>
+		{/each}
+	</div>
+
+	<h3 class="sub">Zeitplan</h3>
+	<p class="muted small">
+		Gruppenspiele laufen pro Scheibe im festen Takt ab Turnierbeginn. Die KO-Runden starten zu den eingetragenen Uhrzeiten.
+		Der Plan ist eine Richtschnur: Spiele starten trotzdem, sobald die Scheibe frei ist.
+	</p>
+	<div class="grid">
+		<div>
+			<label for="date">Turniertag</label>
+			<input id="date" type="date" bind:value={eventDate} />
+		</div>
+		<div>
+			<label for="start">Beginn Gruppenphase</label>
+			<input id="start" type="time" bind:value={startTime} />
+		</div>
+		<div>
+			<label for="slot">Minuten pro Gruppenspiel</label>
+			<input id="slot" type="number" min="5" max="60" bind:value={slotMinutes} />
+		</div>
+	</div>
+	<div class="grid times">
+		{#each TIME_KEYS as t (t.key)}
+			<div>
+				<label for="t-{t.key}">{t.label}</label>
+				<input id="t-{t.key}" type="time" bind:value={koTimes[t.key]} />
 			</div>
 		{/each}
 	</div>
@@ -182,6 +231,10 @@
 	}
 	.sub {
 		margin-top: 1.5rem;
+	}
+	.times {
+		margin-top: 1rem;
+		grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
 	}
 	.small {
 		font-size: 0.9rem;

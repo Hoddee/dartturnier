@@ -33,9 +33,10 @@
 		<div class="round r-{round}">
 			<h3>{KO_ROUND_LABELS[round]}</h3>
 			<div class="matches">
-				{#each defs.filter((d) => d.round === round) as d (d.id)}
+				{#each defs.filter((d) => d.round === round || (round === 'F' && d.round === 'P3')).sort((x, y) => (x.round === 'P3' ? 1 : 0) - (y.round === 'P3' ? 1 : 0)) as d (d.id)}
 					{@const m = byId.get(d.id)}
-					<div class="match" class:live={m?.status === 'live'} class:done={m?.status === 'finished'}>
+					<div class="match" class:p3={d.round === 'P3'} class:live={m?.status === 'live'} class:done={m?.status === 'finished'}>
+						{#if d.round === 'P3'}<div class="tag">Spiel um Platz 3</div>{/if}
 						{#each [0, 1] as const as s (s)}
 							{@const x = slot(m, d.id, s)}
 							<div class="line" class:won={x.won} class:empty={!x.pid}>
@@ -143,6 +144,15 @@
 	}
 	.compact .match.live .info {
 		display: flex;
+	}
+	.tag {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--text-2);
+		padding: 0.3rem 0.6rem 0;
+	}
+	.r-F .match.p3 {
+		border-color: var(--line-strong);
 	}
 	.r-F .match {
 		border-color: rgba(242, 193, 78, 0.45);

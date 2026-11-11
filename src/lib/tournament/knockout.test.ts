@@ -13,16 +13,27 @@ const byId = new Map(defs.map((d) => [d.id, d]));
 /** Alle Setzplätze ("A1" = Gruppensieger A, "B2" = Zweiter B), die in einen Slot münden können. */
 function seeds(source: SlotSource): string[] {
 	if (source.type === 'group') return [`${source.group}${source.place}`];
+	// Platz 3 zählt hier nicht: Verlierer kommen aus beiden Hälften
 	const d = byId.get(source.matchId)!;
 	return [...seeds(d.a), ...seeds(d.b)];
 }
 const groupsOf = (s: SlotSource) => new Set(seeds(s).map((x) => x[0]));
 
 describe('Turnierbaum', () => {
-	it('besteht aus 8 + 4 + 2 + 1 Matches', () => {
+	it('besteht aus 8 + 4 + 2 + Platz 3 + Finale', () => {
 		const count = (round: string) => defs.filter((d) => d.round === round).length;
-		expect([count('R16'), count('QF'), count('SF'), count('F')]).toEqual([8, 4, 2, 1]);
-		expect(new Set(defs.map((d) => d.id)).size).toBe(15);
+		expect([count('R16'), count('QF'), count('SF'), count('P3'), count('F')]).toEqual([8, 4, 2, 1, 1]);
+		expect(new Set(defs.map((d) => d.id)).size).toBe(16);
+	});
+
+	it('Spiel um Platz 3: Verlierer der Halbfinals, First to 5, eigene Scheibe', () => {
+		const p3 = byId.get('P3-1')!;
+		expect(p3.a).toEqual({ type: 'loser', matchId: 'SF-1' });
+		expect(p3.b).toEqual({ type: 'loser', matchId: 'SF-2' });
+		expect(p3.legsToWin).toBe(5);
+		expect(p3.board).toBe(2);
+		expect(byId.get('F-1')!.legsToWin).toBe(6);
+		expect(byId.get('R16-1')!.legsToWin).toBe(3);
 	});
 
 	it('Achtelfinale kreuzt benachbarte Gruppen (A1–B2, B1–A2, ...)', () => {
@@ -37,7 +48,7 @@ describe('Turnierbaum', () => {
 	});
 
 	it('Spieler derselben Gruppe treffen vor dem Finale nie aufeinander', () => {
-		for (const d of defs.filter((x) => x.round !== 'F')) {
+		for (const d of defs.filter((x) => x.round !== 'F' && x.round !== 'P3')) {
 			const ga = groupsOf(d.a);
 			const gb = groupsOf(d.b);
 			for (const g of ga) expect(gb.has(g)).toBe(false);
@@ -68,7 +79,7 @@ describe('Turnierbaum', () => {
 	it('Legs pro Runde sind konfigurierbar', () => {
 		const custom = buildKnockout(groupIds, {
 			boardCount: 2,
-			legsToWin: { R16: 3, QF: 4, SF: 5, F: 7 }
+			legsToWin: { R16: 3, QF: 4, SF: 5, P3: 4, F: 7 }
 		});
 		expect(custom.find((d) => d.id === 'R16-1')!.legsToWin).toBe(3);
 		expect(custom.find((d) => d.id === 'F-1')!.legsToWin).toBe(7);

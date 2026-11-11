@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { store } from '$lib/data/store.svelte';
-	import { matchState, nameOf, roundLabel } from '$lib/logic/derive';
+	import { boardDelay, formatTime, matchState, nameOf, plannedStart, roundLabel } from '$lib/logic/derive';
 	import { BOARD_COUNT } from '$lib/logic/plans';
 	import type { MatchRow } from '$lib/db-types';
 	import { ui } from './ui.svelte';
@@ -40,6 +40,27 @@
 		return r.length ? `bereit: ${r.join(', ')}` : 'geplant';
 	}
 
+	function setScorer(m: MatchRow, e: Event) {
+		const v = (e.target as HTMLSelectElement).value || null;
+		void ui.run(
+			() => store.backend.updateMatch(m.id, { scorer_id: v }),
+			v ? `Zähler: ${nameOf(names, v)}` : 'Zähler offen'
+		);
+	}
+
+	let now = $state(new Date());
+	$effect(() => {
+		const t = setInterval(() => (now = new Date()), 30000);
+		return () => clearInterval(t);
+	});
+	const delays = $derived(
+		Array.from({ length: BOARD_COUNT }, (_, i) => ({
+			board: i + 1,
+			delay: boardDelay(i + 1, store.data.matches, store.data.settings, now)
+		}))
+	);
+	const playersSorted = $derived([...store.data.players].sort((a, b) => a.name.localeCompare(b.name, 'de')));
+
 	function setBoard(m: MatchRow, e: Event) {
 		const v = Number((e.target as HTMLSelectElement).value);
 		void ui.run(() => store.backend.updateMatch(m.id, { board: v || null }), `${m.id} auf Scheibe ${v}`);
@@ -78,6 +99,24 @@
 	}
 </script>
 
+<section class="panel delays">
+	<h2>Zeitplan</h2>
+	<div class="delay-list">
+		{#each delays as d (d.board)}
+			<div class="delay" class:late={d.delay !== null && d.delay > 10 && d.delay < 720} class:ok={d.delay !== null && d.delay <= 10 && d.delay > -720}>
+				<span>Scheibe {d.board}</span>
+				<strong class="num">
+					{#if d.delay === null}fertig{:else if Math.abs(d.delay) > 12 * 60}–{:else if d.delay > 5}+{d.delay} Min{:else if d.delay < -5}{-d.delay} Min früher{:else}im Plan{/if}
+				</strong>
+			</div>
+		{/each}
+	</div>
+	<p class="muted note">
+		Abweichung vom Zeitplan beim aktuellen Spiel jeder Scheibe. Wird erst am Turniertag angezeigt; Zeiten unter
+		Einstellungen.
+	</p>
+</section>
+
 <section class="panel">
 	<div class="filters">
 		<div class="seg" role="group" aria-label="Status">
@@ -98,17 +137,20 @@
 			<table class="data">
 				<thead>
 					<tr>
+						<th>Plan</th>
 						<th>Runde</th>
 						<th>Spiel</th>
 						<th class="n">Legs</th>
 						<th>Status</th>
 						<th>Scheibe</th>
+						<th>Zähler</th>
 						<th><span class="sr-only">Aktionen</span></th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each list as m (m.id)}
 						<tr class={m.status}>
+							<td class="num t">{formatTime(plannedStart(m, store.data.settings, store.data.matches))}</td>
 							<td class="r">{roundLabel(m)}</td>
 							<td>{nameOf(names, m.player_a, 'offen')} – {nameOf(names, m.player_b, 'offen')}</td>
 							<td class="n">{m.legs_a}:{m.legs_b}</td>
@@ -119,6 +161,20 @@
 							<td>
 								<select value={m.board ?? 0} onchange={(e) => setBoard(m, e)} disabled={m.status !== 'scheduled' || ui.busy} aria-label="Scheibe">
 									{#each Array.from({ length: BOARD_COUNT }, (_, i) => i + 1) as b (b)}<option value={b}>{b}</option>{/each}
+								</select>
+							</td>
+							<td>
+								<select
+									class="scorer"
+									value={m.scorer_id ?? ''}
+									onchange={(e) => setScorer(m, e)}
+									disabled={m.status === 'finished' || ui.busy}
+									aria-label="Zähler"
+								>
+									<option value="">offen</option>
+									{#each playersSorted.filter((p) => p.id !== m.player_a && p.id !== m.player_b) as p (p.id)}
+										<option value={p.id}>{p.name}</option>
+									{/each}
 								</select>
 							</td>
 							<td class="actions">
@@ -152,6 +208,40 @@
 </section>
 
 <style>
+	.delays {
+		margin-bottom: 1rem;
+	}
+	.delay-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+		gap: 0.6rem;
+	}
+	.delay {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		padding: 0.6rem 0.8rem;
+		border-radius: var(--r-md);
+		background: var(--navy-900);
+		border: 1px solid var(--line);
+	}
+	.delay strong {
+		font-size: 1.3rem;
+	}
+	.delay.ok strong {
+		color: #6fe3a8;
+	}
+	.delay.late strong {
+		color: var(--gold);
+	}
+	td.t {
+		color: var(--text-2);
+		font-size: 1.05rem;
+	}
+	select.scorer {
+		width: 10rem;
+		padding: 0.3em 0.4em;
+	}
 	.filters {
 		display: flex;
 		gap: 0.75rem;

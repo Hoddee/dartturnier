@@ -35,6 +35,7 @@
 				const patch: Record<string, string> = {};
 				if (a.player_a) patch.player_a = a.player_a;
 				if (a.player_b) patch.player_b = a.player_b;
+				if (a.scorer_id) patch.scorer_id = a.scorer_id;
 				await store.backend.updateMatch(a.matchId, patch);
 			}
 		}, 'Achtelfinale befüllt');
@@ -126,14 +127,18 @@
 		{:else if assignments.length}
 			<ul class="assign">
 				{#each assignments as a (a.matchId)}
+					{@const row = koMatches.find((m) => m.id === a.matchId)}
 					<li>
 						<span class="muted">{a.matchId.replace('R16-', 'Achtelfinale ')}:</span>
-						{a.player_a ? nameOf(names, a.player_a) : '…'} – {a.player_b ? nameOf(names, a.player_b) : '…'}
+						{#if a.player_a || a.player_b}
+							{nameOf(names, a.player_a ?? row?.player_a, '…')} – {nameOf(names, a.player_b ?? row?.player_b, '…')}
+						{/if}
+						{#if a.scorer_id}<span class="muted">· Zähler {nameOf(names, a.scorer_id)}</span>{/if}
 					</li>
 				{/each}
 			</ul>
 			<button class="btn primary" onclick={fillR16} disabled={ui.busy}>
-				{assignments.length} Achtelfinale eintragen
+				Achtelfinale eintragen
 			</button>
 		{:else}
 			<p class="muted">Gerade gibt es nichts einzutragen.</p>

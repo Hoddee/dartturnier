@@ -191,6 +191,26 @@ export class SupabaseBackend implements Backend {
 		await check(this.db.from('players').delete().eq('id', id));
 	}
 
+	async setPlayerPhoto(playerId: string, photo: Blob | null) {
+		const bucket = this.db.storage.from('player-photos');
+		// Alte Fotos des Spielers entfernen (Dateiname enthält einen Zeitstempel gegen Browser-Cache)
+		const { data: old } = await bucket.list('', { search: playerId });
+		const oldPaths = (old ?? []).map((f) => f.name).filter((n) => n.startsWith(playerId));
+		let url: string | null = null;
+		if (photo) {
+			const path = `${playerId}-${Date.now()}.jpg`;
+			const { error } = await bucket.upload(path, photo, {
+				contentType: photo.type || 'image/jpeg',
+				cacheControl: '31536000',
+				upsert: false
+			});
+			if (error) throw new BackendError('other', `Foto konnte nicht hochgeladen werden: ${error.message}`);
+			url = bucket.getPublicUrl(path).data.publicUrl;
+		}
+		await check(this.db.from('players').update({ photo_url: url }).eq('id', playerId));
+		if (oldPaths.length) await bucket.remove(oldPaths);
+	}
+
 	async saveGroups(groups: GroupAssignment[]) {
 		await check(this.db.from('group_overrides').delete().neq('group_id', ''));
 		await check(this.db.from('group_players').delete().neq('group_id', ''));
@@ -205,15 +225,37 @@ export class SupabaseBackend implements Backend {
 
 	async replaceMatches(stage: 'group' | 'ko', rows: NewMatch[]) {
 		// Verweise auf Folgematches zuerst lösen, sonst blockieren sich die Fremdschlüssel
-		if (stage === 'ko') await check(this.db.from('matches').update({ next_match_id: null }).eq('stage', 'ko'));
+		if (stage === 'ko') {
+			await check(
+				this.db
+					.from('matches')
+					.update({ next_match_id: null, loser_next_match_id: null, scorer_from_loser_of: null })
+					.eq('stage', 'ko')
+			);
+		}
 		await check(this.db.from('matches').delete().eq('stage', stage));
 		if (!rows.length) return;
 		// Folgematches existieren erst nach dem Einfügen: Verknüpfung in zwei Schritten
-		await check(this.db.from('matches').insert(rows.map((r) => ({ ...r, next_match_id: null }))));
-		const links = rows.filter((r) => r.next_match_id);
+		await check(
+			this.db
+				.from('matches')
+				.insert(rows.map((r) => ({ ...r, next_match_id: null, loser_next_match_id: null, scorer_from_loser_of: null })))
+		);
+		const links = rows.filter((r) => r.next_match_id || r.loser_next_match_id || r.scorer_from_loser_of);
 		await Promise.all(
 			links.map((r) =>
-				check(this.db.from('matches').update({ next_match_id: r.next_match_id, next_slot: r.next_slot }).eq('id', r.id))
+				check(
+					this.db
+						.from('matches')
+						.update({
+							next_match_id: r.next_match_id,
+							next_slot: r.next_slot,
+							loser_next_match_id: r.loser_next_match_id,
+							loser_next_slot: r.loser_next_slot,
+							scorer_from_loser_of: r.scorer_from_loser_of
+						})
+						.eq('id', r.id)
+				)
 			)
 		);
 	}
@@ -243,7 +285,12 @@ export class SupabaseBackend implements Backend {
 	}
 
 	async resetTournament() {
-		await check(this.db.from('matches').update({ next_match_id: null }).neq('id', ''));
+		await check(
+			this.db.from('matches').update({ next_match_id: null, loser_next_match_id: null, scorer_from_loser_of: null }).neq('id', '')
+		);
+		const bucket = this.db.storage.from('player-photos');
+		const { data: files } = await bucket.list('', { limit: 1000 });
+		if (files?.length) await bucket.remove(files.map((f) => f.name));
 		await check(this.db.from('matches').delete().neq('id', ''));
 		await check(this.db.from('group_overrides').delete().neq('group_id', ''));
 		await check(this.db.from('group_players').delete().neq('group_id', ''));

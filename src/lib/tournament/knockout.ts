@@ -1,8 +1,10 @@
-export type KoRound = 'R16' | 'QF' | 'SF' | 'F';
+/** P3 = Spiel um Platz 3 */
+export type KoRound = 'R16' | 'QF' | 'SF' | 'P3' | 'F';
 
 export type SlotSource =
 	| { type: 'group'; group: string; place: number }
-	| { type: 'winner'; matchId: string };
+	| { type: 'winner'; matchId: string }
+	| { type: 'loser'; matchId: string };
 
 export interface KoMatchDef {
 	/** z. B. "R16-3", "QF-1", "SF-2", "F-1" */
@@ -18,15 +20,13 @@ export interface KoMatchDef {
 }
 
 export interface KoConfig {
-	/**
-	 * Legs zum Sieg pro Runde. Platzhalter-Werte, Entscheidung steht noch aus.
-	 */
+	/** Legs zum Sieg pro Runde. */
 	legsToWin: Record<KoRound, number>;
 	boardCount: number;
 }
 
 export const DEFAULT_KO_CONFIG: KoConfig = {
-	legsToWin: { R16: 4, QF: 4, SF: 5, F: 6 },
+	legsToWin: { R16: 3, QF: 4, SF: 5, P3: 5, F: 6 },
 	boardCount: 4
 };
 
@@ -34,6 +34,7 @@ export const KO_ROUND_LABELS: Record<KoRound, string> = {
 	R16: 'Achtelfinale',
 	QF: 'Viertelfinale',
 	SF: 'Halbfinale',
+	P3: 'Spiel um Platz 3',
 	F: 'Finale'
 };
 
@@ -53,6 +54,7 @@ export function buildKnockout(
 	}
 	const g = (group: string, place: number): SlotSource => ({ type: 'group', group, place });
 	const w = (matchId: string): SlotSource => ({ type: 'winner', matchId });
+	const l = (matchId: string): SlotSource => ({ type: 'loser', matchId });
 
 	// Obere Baumhälfte: Sieger der Gruppen 1 gegen Zweite der Nachbargruppe; untere Hälfte gespiegelt.
 	const pairs: [SlotSource, SlotSource][] = [];
@@ -96,6 +98,15 @@ export function buildKnockout(
 		});
 	}
 	defs.push({
+		id: 'P3-1',
+		round: 'P3',
+		index: 1,
+		a: l('SF-1'),
+		b: l('SF-2'),
+		legsToWin: config.legsToWin.P3 ?? config.legsToWin.SF,
+		board: Math.min(2, config.boardCount)
+	});
+	defs.push({
 		id: 'F-1',
 		round: 'F',
 		index: 1,
@@ -115,6 +126,8 @@ export interface KoContext {
 	groupRankings: Record<string, string[] | undefined>;
 	/** Sieger bereits beendeter KO-Matches (matchId → Spieler-ID). */
 	winners: Record<string, string | undefined>;
+	/** Verlierer bereits beendeter KO-Matches (für das Spiel um Platz 3). */
+	losers?: Record<string, string | undefined>;
 }
 
 export interface ResolvedKoMatch {
@@ -128,6 +141,7 @@ export interface ResolvedKoMatch {
 
 function resolveSlot(source: SlotSource, ctx: KoContext): string | null {
 	if (source.type === 'group') return ctx.groupRankings[source.group]?.[source.place - 1] ?? null;
+	if (source.type === 'loser') return ctx.losers?.[source.matchId] ?? null;
 	return ctx.winners[source.matchId] ?? null;
 }
 

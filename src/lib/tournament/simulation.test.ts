@@ -49,10 +49,13 @@ function simulate(seed: number) {
 
 	const defs = buildKnockout(groups.map((g) => g.id));
 	const winners: Record<string, string> = {};
+	const losers: Record<string, string> = {};
 	for (const def of defs) {
-		const m = resolveKnockout(defs, { groupRankings, winners }).find((r) => r.def.id === def.id)!;
+		const m = resolveKnockout(defs, { groupRankings, winners, losers }).find((r) => r.def.id === def.id)!;
 		expect(m.ready).toBe(true);
-		winners[def.id] = rng() < 0.5 ? m.playerA! : m.playerB!;
+		const aWins = rng() < 0.5;
+		winners[def.id] = aWins ? m.playerA! : m.playerB!;
+		losers[def.id] = aWins ? m.playerB! : m.playerA!;
 	}
 	return { players, groups, schedule, groupRankings, defs, winners, manualResolutions };
 }
@@ -62,7 +65,7 @@ describe('Probe-Turnier (32 Spieler)', () => {
 		it(`läuft vollständig durch (Seed ${seed})`, () => {
 			const t = simulate(seed);
 			expect(t.schedule).toHaveLength(48);
-			expect(Object.keys(t.winners)).toHaveLength(15);
+			expect(Object.keys(t.winners)).toHaveLength(16);
 
 			// Genau 16 Spieler im Achtelfinale, alle aus den Top 2 ihrer Gruppe
 			const r16 = resolveKnockout(t.defs, { groupRankings: t.groupRankings, winners: {} }).filter(

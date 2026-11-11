@@ -11,11 +11,20 @@ Turnier-Software für 32 Spieler und 4 Scheiben: iPad-Eingabe an jeder Scheibe, 
 | `/board` | iPads | Scheibe einrichten, danach Eingabe unter `/board/1` bis `/board/4` |
 | `/admin` | Turnierleitung | Spieler, Gruppen, Spielplan, Spiele, Einstellungen |
 
+## Turnierablauf
+
+- **28.12., Beginn 14:00 Uhr**, Finale geplant um **22:00 Uhr** (Zeiten unter Admin → Einstellungen → Zeitplan).
+- Legs: Gruppenphase und Achtelfinale First to 3, Viertelfinale 4, Halbfinale 5, Spiel um Platz 3 5, Finale 6.
+- **Zähler:** In der Gruppe zählt immer ein Gruppenmitglied, das gerade nicht spielt (fair verteilt: zwei Spieler zweimal, zwei einmal, möglichst nie direkt vor dem eigenen Spiel). Achtelfinale: Spieler der zweiten Welle zählen die erste, die Verlierer der ersten Welle zählen die zweite. Ab dem Viertelfinale ist der Zähler offen und kann unter Admin → Spiele eingetragen werden. Der Zähler gibt die Darts am iPad ein.
+- **Einblendungen:** 180er und High Finishes ab 100 erscheinen groß auf dem TV und als Hinweis auf der Live-Seite.
+- **Spielende:** Das Ergebnis bleibt auf TV und Live-Seite 20 Sekunden stehen; das iPad springt nach 30 Sekunden automatisch zum nächsten Spiel.
+- **Spielerfotos:** Admin → Spieler, auf den Kreis neben dem Namen tippen. Bilder werden vor dem Hochladen auf 320 × 320 Pixel verkleinert (Supabase Storage, Bucket `player-photos`).
+
 ## 1. Supabase einrichten
 
-Das Projekt **Dartturnier_Software** (`https://ukqddtrmxxughmtrcjqr.supabase.co`) ist eingerichtet: alle drei Migrationen aus `supabase/migrations/` sind ausgeführt, der Board-Schlüssel ist gesetzt.
+Das Projekt **Dartturnier_Software** (`https://ukqddtrmxxughmtrcjqr.supabase.co`) ist eingerichtet: alle Migrationen aus `supabase/migrations/` sind ausgeführt, der Board-Schlüssel ist gesetzt.
 
-Für ein neues Projekt die drei Dateien in `supabase/migrations/` der Reihe nach im **SQL Editor** ausführen.
+Für ein neues Projekt die Dateien in `supabase/migrations/` der Reihe nach im **SQL Editor** ausführen.
 
 Danach in Supabase von Hand (geht nicht per SQL):
 1. **Authentication → Sign In / Providers:** „Allow new users to sign up“ ausschalten. Sonst kann sich jeder registrieren und hätte Admin-Rechte.
@@ -82,7 +91,7 @@ Andere Anbieter (Netlify, Cloudflare Pages) funktionieren genauso.
 ## Entwicklung
 
 ```bash
-npm test        # 80 Tests: Spielregeln, Checkouts, Tabellen, KO-Baum, komplettes Turnier, Datenbank-Funktionen
+npm test        # 82 Tests: Spielregeln, Checkouts, Tabellen, KO-Baum, komplettes Turnier, Datenbank-Funktionen
 npm run check   # Typprüfung
 npm run build   # Produktions-Build
 ```

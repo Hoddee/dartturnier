@@ -243,7 +243,7 @@ function slotLabel(source: SlotSource): string {
 	if (source.type === 'group') return `${source.place}. Gruppe ${source.group}`;
 	const [round, index] = source.matchId.split('-');
 	const names: Record<string, string> = { R16: 'Achtelfinale', QF: 'Viertelfinale', SF: 'Halbfinale' };
-	return `Sieger ${names[round] ?? round} ${index}`;
+	return `${source.type === 'loser' ? 'Verlierer' : 'Sieger'} ${names[round] ?? round} ${index}`;
 }
 
 /** Platzhalter-Texte für noch offene KO-Plätze, z. B. "1. Gruppe A". */
@@ -280,4 +280,55 @@ export function deriveAll(s: Data) {
 	const overrides = Object.fromEntries(s.overrides.map((o) => [o.group_id, o.manual_order]));
 	const standings = computeAllStandings(groups, s.matches, s.settings, overrides, averagesOf(totals));
 	return { players, dartsByMatch, groups, totals, standings, leaders: leaderboards(totals) };
+}
+
+// ---------------------------------------------------------------------------
+// Zeitplan
+// ---------------------------------------------------------------------------
+
+function at(date: string, time: string, plusMinutes = 0): Date | null {
+	const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+	const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
+	if (!m || !d) return null;
+	// Ortszeit des Geräts (Turnier in Deutschland)
+	return new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]), Number(m[1]), Number(m[2]) + plusMinutes);
+}
+
+/** Geplante Startzeit eines Spiels laut Zeitplan in den Einstellungen. */
+export function plannedStart(m: MatchRow, s: TournamentSettingsRow, matches: MatchRow[]): Date | null {
+	if (!s.event_date || !s.start_time) return null;
+	if (m.stage === 'group') {
+		const onBoard = matches
+			.filter((x) => x.stage === 'group' && x.board === m.board)
+			.sort((a, b) => (a.queue_index ?? 0) - (b.queue_index ?? 0));
+		const i = onBoard.findIndex((x) => x.id === m.id);
+		return at(s.event_date, s.start_time, Math.max(0, i) * (s.slot_minutes || 20));
+	}
+	const times = s.ko_times ?? {};
+	const index = Number(m.id.split('-')[1] ?? 1);
+	const key = m.round === 'R16' ? (index <= 4 ? 'R16a' : 'R16b') : m.round;
+	const t = (times as Record<string, string>)[key];
+	return t ? at(s.event_date, t) : null;
+}
+
+export function formatTime(d: Date | null): string {
+	return d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+/**
+ * Verzug einer Scheibe in Minuten (positiv = hinter dem Plan), gemessen am aktuellen Spiel.
+ * null, wenn nichts ansteht.
+ */
+export function boardDelay(
+	board: number,
+	matches: MatchRow[],
+	s: TournamentSettingsRow,
+	now: Date = new Date()
+): number | null {
+	const current = currentMatchForBoard(matches, board);
+	if (!current) return null;
+	const planned = plannedStart(current, s, matches);
+	if (!planned) return null;
+	const reference = current.status === 'live' && current.started_at ? new Date(current.started_at) : now;
+	return Math.round((reference.getTime() - planned.getTime()) / 60000);
 }

@@ -69,6 +69,8 @@ export interface Backend {
 	addPlayers(names: string[]): Promise<void>;
 	renamePlayer(id: string, name: string): Promise<void>;
 	deletePlayer(id: string): Promise<void>;
+	/** Spielerfoto setzen (bereits verkleinertes Bild) oder mit null entfernen. */
+	setPlayerPhoto(playerId: string, photo: Blob | null): Promise<void>;
 	/** Ersetzt alle Gruppen und Gruppenzuordnungen (inkl. manueller Entscheidungen). */
 	saveGroups(groups: GroupAssignment[]): Promise<void>;
 	/** Löscht alle Matches der Phase (samt Darts) und legt die neuen an. */

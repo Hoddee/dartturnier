@@ -4,20 +4,68 @@
 	import { checkoutLabels } from '$lib/engine/checkout';
 	import { formatDart } from '$lib/engine/dart';
 	import { threeDartAverage } from '$lib/engine/match';
+	import { onDestroy } from 'svelte';
+	import Avatar from './Avatar.svelte';
 
 	interface Props {
 		board: number;
 		/** Große Darstellung für den Fernseher */
 		large?: boolean;
+		/** So lange bleibt ein gerade beendetes Spiel mit Ergebnis stehen (Sekunden) */
+		holdSeconds?: number;
 	}
-	let { board, large = false }: Props = $props();
+	let { board, large = false, holdSeconds = 20 }: Props = $props();
 
-	const match = $derived(currentMatchForBoard(store.data.matches, board));
+	const current = $derived(currentMatchForBoard(store.data.matches, board));
+
+	// Gerade beendetes Spiel eine Weile stehen lassen, damit alle das Ergebnis sehen
+	const prevStatus = new Map<string, string>();
+	let heldId = $state<string | null>(null);
+	let holdTimer: ReturnType<typeof setTimeout> | undefined;
+	$effect(() => {
+		for (const m of store.data.matches) {
+			if (m.board !== board) continue;
+			const before = prevStatus.get(m.id);
+			if (before === 'live' && m.status === 'finished') {
+				heldId = m.id;
+				clearTimeout(holdTimer);
+				holdTimer = setTimeout(() => (heldId = null), holdSeconds * 1000);
+			}
+			if (heldId === m.id && m.status !== 'finished') heldId = null; // Undo am iPad
+			prevStatus.set(m.id, m.status);
+		}
+	});
+	onDestroy(() => {
+		clearTimeout(holdTimer);
+		clearTimeout(legTimer);
+	});
+
+	const held = $derived(heldId ? (store.data.matches.find((m) => m.id === heldId) ?? null) : null);
+	const match = $derived(held ?? current);
+	const finishedHold = $derived(!!held && held.status === 'finished');
 	const next = $derived(upcomingForBoard(store.data.matches, board, 1)[0] ?? null);
 	const state = $derived(match ? matchState(match, store.data.dartsByMatch[match.id]) : null);
 	const players = $derived(store.view.players);
 	const placeholders = $derived(koPlaceholders(store.view.groups.map((g) => g.id)));
 	const live = $derived(match?.status === 'live' && match.first_thrower_set);
+
+	// Leg gewonnen: Spielerfeld kurz aufleuchten lassen
+	let legFlash = $state<0 | 1 | null>(null);
+	let legTimer: ReturnType<typeof setTimeout> | undefined;
+	let lastLegs: { id: string; legs: [number, number] } | null = null;
+	$effect(() => {
+		if (!match || !state) return;
+		const legs: [number, number] = [state.legsWon[0], state.legsWon[1]];
+		if (lastLegs && lastLegs.id === match.id) {
+			const slot = legs[0] > lastLegs.legs[0] ? 0 : legs[1] > lastLegs.legs[1] ? 1 : null;
+			if (slot !== null && !state.finished) {
+				legFlash = slot;
+				clearTimeout(legTimer);
+				legTimer = setTimeout(() => (legFlash = null), 2600);
+			}
+		}
+		lastLegs = { id: match.id, legs };
+	});
 
 	function lastVisitText(slot: 0 | 1): string {
 		if (!state) return '';
@@ -32,7 +80,9 @@
 		<span class="label">Scheibe {board}</span>
 		{#if match}
 			<span class="round">{roundLabel(match)}</span>
-			{#if live}
+			{#if finishedHold}
+				<span class="status done">Beendet</span>
+			{:else if live}
 				<span class="status"><span class="live-dot"></span> Live</span>
 			{:else}
 				<span class="status muted">Gleich geht's los</span>
@@ -47,12 +97,19 @@
 				{@const active = live && !state.finished && state.currentPlayer === slot}
 				{@const rest = state.remaining[slot]}
 				{@const co = active && rest <= 170 ? checkoutLabels(rest, 3 - state.currentVisit.length) : null}
-				<div class="player" class:active>
+				{@const won = finishedHold && match.winner_id === pid}
+				<div class="player" class:active class:legwon={legFlash === slot} class:won class:lost={finishedHold && !won}>
 					<div class="name-row">
+						<Avatar playerId={pid} size={large ? 3 : 2.2} />
 						<a class="name" href="/spieler/{pid}">{nameOf(players, pid)}</a>
 						<span class="legs num" aria-label="Legs">{state.legsWon[slot]}</span>
 					</div>
-					<div class="rest num">{live ? rest : '501'}</div>
+					{#if finishedHold}
+						<div class="rest num result">{won ? 'Sieg' : ''}</div>
+					{:else}
+						<div class="rest num">{live ? rest : '501'}</div>
+					{/if}
+					{#if legFlash === slot}<div class="legbadge num">Leg gewonnen</div>{/if}
 					<div class="meta">
 						<span class="num">Ø {formatAverage(threeDartAverage(state.stats[slot]))}</span>
 						{#if active && state.currentVisit.length}
@@ -70,7 +127,8 @@
 			{/each}
 		</div>
 		<footer class="muted">
-			First to {match.legs_to_win} · Leg {state.currentLeg + 1}
+			<span>First to {match.legs_to_win}{#if !finishedHold} · Leg {state.currentLeg + 1}{/if}</span>
+			<span class="scorer">Zähler: {match.scorer_id ? nameOf(players, match.scorer_id) : 'offen'}</span>
 		</footer>
 	{:else}
 		<div class="idle">
@@ -144,8 +202,65 @@
 	}
 	.name-row {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 0.5rem;
+	}
+	.player {
+		position: relative;
+	}
+	.player.legwon {
+		animation: legglow 2.6s ease-out;
+	}
+	.player.legwon .legs {
+		animation: legpop 0.7s cubic-bezier(0.2, 1.6, 0.4, 1);
+		background: var(--gold);
+		color: var(--navy-950);
+	}
+	.legbadge {
+		position: absolute;
+		right: 0.8rem;
+		bottom: 0.7rem;
+		padding: 0.15rem 0.6rem;
+		border-radius: var(--r-sm);
+		background: var(--gold);
+		color: var(--navy-950);
+		font-weight: 700;
+		animation: legpop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+	}
+	@keyframes legglow {
+		0% {
+			box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 60px rgba(242, 193, 78, 0.5);
+		}
+		100% {
+			box-shadow: inset 0 0 0 0 transparent;
+		}
+	}
+	@keyframes legpop {
+		0% {
+			transform: scale(0.3);
+		}
+		60% {
+			transform: scale(1.35);
+		}
+		100% {
+			transform: scale(1);
+		}
+	}
+	.player.won {
+		background: linear-gradient(180deg, rgba(242, 193, 78, 0.22), transparent 80%);
+	}
+	.player.won .name,
+	.player.won .result {
+		color: var(--gold);
+	}
+	.player.lost {
+		opacity: 0.55;
+	}
+	.result {
+		min-height: 1em;
+	}
+	.status.done {
+		color: var(--gold);
 	}
 	.name {
 		color: var(--text);
@@ -203,6 +318,10 @@
 		font-size: 1.05rem;
 	}
 	footer {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.75rem;
+		flex-wrap: wrap;
 		padding: 0.45rem 1rem;
 		font-size: 0.85rem;
 		border-top: 1px solid var(--line);

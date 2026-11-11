@@ -6,6 +6,8 @@ export interface PlayerRow {
 	created_at: string;
 	/** Eingabereihenfolge */
 	position: number;
+	/** Öffentliche Bild-URL des Spielerfotos (Supabase Storage bzw. Data-URL im Demo-Modus) */
+	photo_url: string | null;
 }
 
 export interface GroupPlayerRow {
@@ -39,6 +41,13 @@ export interface MatchRow {
 	finished_at: string | null;
 	next_match_id: string | null;
 	next_slot: 0 | 1 | null;
+	/** Verlierer rückt hierhin (Halbfinale → Spiel um Platz 3) */
+	loser_next_match_id: string | null;
+	loser_next_slot: 0 | 1 | null;
+	/** Zähler, der an der Scheibe die Darts eingibt (null = offen) */
+	scorer_id: string | null;
+	/** Der Verlierer dieses Matches wird automatisch Zähler (Achtelfinale, zweite Welle) */
+	scorer_from_loser_of: string | null;
 }
 
 /** Felder, die beim Anlegen eines Matches gesetzt werden. */
@@ -55,6 +64,10 @@ export type NewMatch = Pick<
 	| 'legs_to_win'
 	| 'next_match_id'
 	| 'next_slot'
+	| 'loser_next_match_id'
+	| 'loser_next_slot'
+	| 'scorer_id'
+	| 'scorer_from_loser_of'
 >;
 
 export interface DartRow {
@@ -71,8 +84,17 @@ export interface TournamentSettingsRow {
 	points_per_win: number;
 	tiebreakers: string[];
 	group_legs_to_win: number;
-	ko_legs_to_win: Record<'R16' | 'QF' | 'SF' | 'F', number>;
+	ko_legs_to_win: Record<KoRoundKey, number>;
+	/** Zeitplan: Turniertag (YYYY-MM-DD), Beginn (HH:MM), Minuten pro Gruppenspiel */
+	event_date: string;
+	start_time: string;
+	slot_minutes: number;
+	/** Geplante Startzeiten der KO-Runden (HH:MM); R16a/R16b = erste/zweite Achtelfinal-Welle */
+	ko_times: Record<KoTimeKey, string>;
 }
+
+export type KoRoundKey = 'R16' | 'QF' | 'SF' | 'P3' | 'F';
+export type KoTimeKey = 'R16a' | 'R16b' | 'QF' | 'SF' | 'P3' | 'F';
 
 export interface GroupOverrideRow {
 	group_id: string;
@@ -85,7 +107,11 @@ export const DEFAULT_SETTINGS: TournamentSettingsRow = {
 	points_per_win: 2,
 	tiebreakers: ['headToHead', 'legDiff', 'legsWon'],
 	group_legs_to_win: 3,
-	ko_legs_to_win: { R16: 4, QF: 4, SF: 5, F: 6 }
+	ko_legs_to_win: { R16: 3, QF: 4, SF: 5, P3: 5, F: 6 },
+	event_date: '2026-12-28',
+	start_time: '14:00',
+	slot_minutes: 20,
+	ko_times: { R16a: '18:30', R16b: '19:05', QF: '19:45', SF: '20:35', P3: '21:15', F: '22:00' }
 };
 
 /** Kompletter Datenstand, wie ihn alle Ansichten nutzen. */

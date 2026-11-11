@@ -1,6 +1,24 @@
 <script lang="ts">
 	import { store } from '$lib/data/store.svelte';
 	import { ui } from './ui.svelte';
+	import Avatar from '$lib/components/Avatar.svelte';
+	import { shrinkPhoto } from './photo';
+
+	async function uploadPhoto(id: string, name: string, e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		await ui.run(async () => {
+			const blob = await shrinkPhoto(file);
+			await store.backend.setPlayerPhoto(id, blob);
+		}, `Foto für ${name} gespeichert`);
+	}
+
+	function removePhoto(id: string, name: string) {
+		if (!confirm(`Foto von ${name} entfernen?`)) return;
+		void ui.run(() => store.backend.setPlayerPhoto(id, null), 'Foto entfernt');
+	}
 
 	const TARGET = 32;
 	let input = $state('');
@@ -70,16 +88,29 @@
 	{#if players.length === 0}
 		<p class="muted">Noch keine Spieler eingetragen.</p>
 	{:else}
+		<p class="muted hint">Foto antippen, um ein Bild zu wählen. Es wird automatisch quadratisch zugeschnitten und verkleinert.</p>
 		<ol class="list">
 			{#each players as p (p.id)}
 				<li>
-					<input type="text" value={p.name} aria-label="Name" onchange={(e) => rename(p.id, p.name, e)} />
-					<button
-						class="btn small danger"
-						onclick={() => remove(p.id, p.name)}
-						disabled={ui.busy || planned.has(p.id)}
-						title={planned.has(p.id) ? 'Bereits im Spielplan' : 'Löschen'}>Löschen</button
-					>
+					<label class="photo" title="Foto wählen">
+						<Avatar playerId={p.id} size={3.2} />
+						<input type="file" accept="image/*" class="sr-only" onchange={(e) => uploadPhoto(p.id, p.name, e)} disabled={ui.busy} />
+						<span class="sr-only">Foto für {p.name} wählen</span>
+					</label>
+					<div class="fields">
+						<input type="text" value={p.name} aria-label="Name" onchange={(e) => rename(p.id, p.name, e)} />
+						<div class="row-actions">
+							{#if p.photo_url}
+								<button class="btn small" onclick={() => removePhoto(p.id, p.name)} disabled={ui.busy}>Foto entfernen</button>
+							{/if}
+							<button
+								class="btn small danger"
+								onclick={() => remove(p.id, p.name)}
+								disabled={ui.busy || planned.has(p.id)}
+								title={planned.has(p.id) ? 'Bereits im Spielplan' : 'Löschen'}>Löschen</button
+							>
+						</div>
+					</div>
 				</li>
 			{/each}
 		</ol>
@@ -111,28 +142,49 @@
 	}
 	.list {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-		gap: 0.5rem 1.5rem;
-		padding-left: 1.75rem;
+		grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+		gap: 0.75rem 1.25rem;
+		list-style: none;
+		padding: 0;
 		margin: 0;
+		counter-reset: pl;
 	}
 	.list li {
-		padding-left: 0.25rem;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem;
+		border-radius: var(--r-md);
+		background: var(--navy-900);
+		border: 1px solid var(--line);
 	}
-	.list li::marker {
-		color: var(--muted);
-		font-family: var(--font-num);
+	.photo {
+		margin: 0;
+		cursor: pointer;
+		border-radius: 50%;
 	}
-	.list li {
-		display: list-item;
+	.photo:focus-within {
+		outline: 3px solid var(--blue);
+		outline-offset: 2px;
 	}
-	.list li > * {
-		vertical-align: middle;
+	.fields {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
 	}
-	.list input {
-		width: calc(100% - 5.5rem);
-		margin-right: 0.4rem;
-		padding: 0.4em 0.6em;
+	.fields input {
+		padding: 0.35em 0.6em;
+	}
+	.row-actions {
+		display: flex;
+		gap: 0.35rem;
+		justify-content: flex-end;
+	}
+	.hint {
+		font-size: 0.9rem;
+		margin-top: 0;
 	}
 	.warn {
 		color: var(--gold);

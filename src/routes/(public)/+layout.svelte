@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import Logos from '$lib/components/Logos.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
+	import HighlightOverlay from '$lib/components/HighlightOverlay.svelte';
 	import { store } from '$lib/data/store.svelte';
 
 	let { children } = $props();
@@ -53,6 +54,8 @@
 	<a href="/board">Scheibe einrichten</a>
 	<a href="/admin">Turnierleitung</a>
 </footer>
+
+<HighlightOverlay variant="toast" />
 
 <style>
 	.inner {

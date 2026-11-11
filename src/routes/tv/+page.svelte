@@ -6,6 +6,7 @@
 	import Logos from '$lib/components/Logos.svelte';
 	import StandingsTable from '$lib/components/StandingsTable.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
+	import HighlightOverlay from '$lib/components/HighlightOverlay.svelte';
 	import { store } from '$lib/data/store.svelte';
 	import { BOARD_COUNT } from '$lib/logic/plans';
 
@@ -54,8 +55,10 @@
 	<header>
 		<Logos size={4} />
 		<h1>{store.data.settings.name}</h1>
-		<span class="clock num">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span>
-		<button class="btn small fs" onclick={fullscreen}>Vollbild</button>
+		<div class="right">
+			<button class="btn small fs" onclick={fullscreen}>Vollbild</button>
+			<span class="clock num">{now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span>
+		</div>
 	</header>
 
 	<section class="boards">
@@ -91,25 +94,37 @@
 	</section>
 </div>
 
+<HighlightOverlay variant="stage" />
+
 <style>
 	.tv {
 		min-height: 100vh;
+		max-width: 1880px;
+		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
 		padding: 0 1.5rem 1rem;
 		font-size: 1.1rem;
 	}
+	/* Logos links, Titel mittig, Uhr rechts */
 	header {
-		display: flex;
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
 		gap: 1.5rem;
 		padding-top: 0.75rem;
 	}
+	.right {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		justify-self: end;
+	}
 	h1 {
 		margin: 0;
-		font-size: 2.2rem;
-		flex: 1;
+		font-size: 2.4rem;
+		text-align: center;
 	}
 	.clock {
 		font-size: 2.4rem;
@@ -133,7 +148,8 @@
 		font-size: 4.4rem;
 	}
 	.boards :global(.board footer) {
-		display: none;
+		padding-top: 0.25rem;
+		padding-bottom: 0.25rem;
 	}
 	.boards :global(.board .player) {
 		padding-top: 0.6rem;
@@ -148,9 +164,16 @@
 		flex-direction: column;
 	}
 	.slide-head {
-		display: flex;
+		display: grid;
+		grid-template-columns: 1fr auto 1fr;
 		align-items: center;
-		justify-content: space-between;
+	}
+	.slide-head h2 {
+		grid-column: 2;
+		text-align: center;
+	}
+	.dots {
+		justify-self: end;
 	}
 	.slide-head h2 {
 		font-size: 1.4rem;

@@ -64,6 +64,15 @@ function uuid(): string {
 }
 
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const r = new FileReader();
+		r.onload = () => resolve(String(r.result));
+		r.onerror = () => reject(r.error);
+		r.readAsDataURL(blob);
+	});
+}
+
 export class MemoryBackend implements Backend {
 	readonly mode = 'demo' as const;
 	private data: Snapshot;
@@ -131,14 +140,27 @@ export class MemoryBackend implements Backend {
 
 	/** Entspricht dem Trigger advance_winner. */
 	private advance(m: MatchRow, oldWinner: string | null): Change[] {
-		if (!m.next_match_id || m.winner_id === oldWinner) return [];
-		const next = this.data.matches.find((x) => x.id === m.next_match_id);
-		if (!next || next.status !== 'scheduled') return [];
-		if (m.next_slot === 0) next.player_a = m.winner_id;
-		else next.player_b = m.winner_id;
-		next.ready_a = false;
-		next.ready_b = false;
-		return [{ kind: 'upsert', table: 'matches', row: { ...next } }];
+		if (m.winner_id === oldWinner) return [];
+		const loser = !m.winner_id ? null : m.winner_id === m.player_a ? m.player_b : m.player_a;
+		const changes: Change[] = [];
+		const place = (targetId: string | null, slot: 0 | 1 | null, player: string | null) => {
+			const t = targetId ? this.data.matches.find((x) => x.id === targetId) : undefined;
+			if (!t || t.status !== 'scheduled') return;
+			if (slot === 0) t.player_a = player;
+			else t.player_b = player;
+			t.ready_a = false;
+			t.ready_b = false;
+			changes.push({ kind: 'upsert', table: 'matches', row: { ...t } });
+		};
+		place(m.next_match_id, m.next_slot, m.winner_id);
+		place(m.loser_next_match_id, m.loser_next_slot, loser);
+		for (const t of this.data.matches) {
+			if (t.scorer_from_loser_of === m.id && t.status === 'scheduled') {
+				t.scorer_id = loser;
+				changes.push({ kind: 'upsert', table: 'matches', row: { ...t } });
+			}
+		}
+		return changes;
 	}
 
 	private setMatch(m: MatchRow, patch: Partial<MatchRow>): Change[] {
@@ -269,7 +291,7 @@ export class MemoryBackend implements Backend {
 		let pos = Math.max(0, ...this.data.players.map((p) => p.position));
 		const now = new Date().toISOString();
 		for (const name of names) {
-			this.data.players.push({ id: uuid(), name, created_at: now, position: ++pos });
+			this.data.players.push({ id: uuid(), name, created_at: now, position: ++pos, photo_url: null });
 		}
 		this.commit([{ kind: 'reload' }]);
 	}
@@ -349,6 +371,13 @@ export class MemoryBackend implements Backend {
 	async updateSettings(patch: Partial<TournamentSettingsRow>) {
 		this.data.settings = { ...this.data.settings, ...patch, id: 1 };
 		this.commit([{ kind: 'upsert', table: 'tournament_settings', row: { ...this.data.settings } }]);
+	}
+
+	async setPlayerPhoto(playerId: string, photo: Blob | null) {
+		const p = this.data.players.find((x) => x.id === playerId);
+		if (!p) throw new BackendError('other', 'Spieler nicht gefunden');
+		p.photo_url = photo ? await blobToDataUrl(photo) : null;
+		this.commit([{ kind: 'upsert', table: 'players', row: { ...p } }]);
 	}
 
 	async setBoardKey() {
