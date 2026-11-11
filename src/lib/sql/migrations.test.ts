@@ -86,8 +86,9 @@ describe('Supabase-Migrationen', () => {
 		await asRole('anon', async () => {
 			const rows = await db.query('select count(*)::int as n from players');
 			expect((rows.rows[0] as { n: number }).n).toBe(4);
-			const res = await db.query(`update matches set legs_a = 5 where id = 'A-1-1'`);
-			expect(res.affectedRows ?? 0).toBe(0);
+			// anon hat nach der Absicherung gar kein Schreibrecht mehr
+			const e = await errorOf(db.query(`update matches set legs_a = 5 where id = 'A-1-1'`));
+			expect(e.message).toContain('permission denied');
 			await errorOf(db.query(`insert into darts (match_id, seq, segment, multiplier) values ('A-1-1', 1, 20, 3)`));
 			// RLS ohne Policy: Tabelle erscheint leer
 			expect((await db.query('select * from app_secrets')).rows).toHaveLength(0);
